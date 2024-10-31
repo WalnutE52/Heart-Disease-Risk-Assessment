@@ -1,0 +1,96 @@
+---
+output: 
+  pdf_document:
+    latex_engine: xelatex
+header-includes:
+  - \usepackage{fontspec}
+  - \setmainfont{Helvetica}
+---
+
+
+# Platform 2: R
+
+In R, the rpart package is used to create the Decision Tree model, and rpart.plot is used for visualizing the tree structure. The Gini criterion, which measures the impurity of splits, is used in the Decision Tree model by default in R.
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(ggplot2)
+```
+
+## Data Loading
+
+The cleaned dataset from the Jupyter Notebook is used to maintain consistency across both platforms.
+
+```{r}
+data <- read.csv("cleaned_data.csv")
+```
+
+## Data Preprocessing
+The dataset is split into training and testing sets to allow for model evaluation. 70% of the data is used for training, while 30% is reserved for testing. The set.seed(42) ensures reproducibility.
+```{r}
+# Splitting the dataset
+set.seed(42)
+trainingIndex <- createDataPartition(data$HadHeartAttack, p = 0.7, list = FALSE)
+train <- data[trainingIndex, ]
+test <- data[-trainingIndex, ]
+```
+
+## Model Building
+A Decision Tree is built using the rpart function with a maximum depth of 5, consistent with the Python model, and the Gini criterion (default in R). The rpart.plot function is used to visualize the tree, showing significant risk factors for heart disease.
+```{r}
+dt_model <- rpart(HadHeartAttack ~ ., 
+                  data = train, 
+                  method = "class", 
+                  control = rpart.control(maxdepth = 5, cp = 0.001, minsplit = 20))
+
+# Print summary of the model to check variable importance and splits
+summary(dt_model)
+
+```
+
+## Model Evaluation
+The model is used to predict the outcomes in the test set, and a confusion matrix is generated to evaluate the accuracy of the model, comparing predicted and actual outcomes。
+```{r}
+# Make predictions
+predictions <- predict(dt_model, newdata = test, type = "class")
+
+# Convert both to factors and ensure they have the same levels
+predictions <- as.factor(predictions)
+test$HadHeartAttack <- as.factor(test$HadHeartAttack)
+
+# Ensure they have the same levels
+levels(predictions) <- levels(test$HadHeartAttack)
+
+# Evaluate the model
+confusionMatrix(predictions, test$HadHeartAttack)
+```
+## Model Visualization
+The rpart.plot function is used to visualize the tree, showing significant risk factors for heart dise
+```{r}
+
+# Plot the decision tree with enhanced visualization
+rpart.plot(dt_model, main = "Decision Tree for Heart Disease Risk Factors", extra = 106)
+```
+
+```{r}
+# Extract variable importance
+importance <- as.data.frame(dt_model$variable.importance)
+# Convert row names to a proper column for plotting
+importance$Variable <- rownames(importance)
+# Rename the columns for clarity
+colnames(importance) <- c("Importance", "Variable")
+# Sort the factors by importance in descending order
+importance <- importance[order(-importance$Importance), ]
+# Select the top 10 most important factors
+top_10_importance <- importance[1:10, ]
+# Plot using ggplot2
+ggplot(top_10_importance, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +  # Flip the coordinates to have a horizontal bar plot
+  theme_minimal() +
+  labs(title = "R - Top 10 Significant Risk Factors", x = "Risk Factors", y = "Importance")
+```
